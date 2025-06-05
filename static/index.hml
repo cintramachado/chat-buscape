@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat LAN</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        #messages { border: 1px solid #ccc; height: 300px; overflow-y: scroll; margin-bottom: 1em; padding: 0.5em; }
+        #input, #username { width: 70%; }
+        .msg { margin-bottom: .5em; }
+        .user { font-weight: bold; color: #2b2b70;}
+        .time { color: #aaa; font-size: 0.9em;}
+    </style>
+</head>
+<body>
+    <h2>Chat LAN (Python + SQLite)</h2>
+    <div>
+        <input id="username" placeholder="Seu nome" value="Anonymous">
+    </div>
+    <div id="messages"></div>
+    <input id="input" autocomplete="off" placeholder="Digite sua mensagem...">
+    <button id="send">Enviar</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+
+        function escapeHtml(unsafe) {
+            return unsafe.replace(/[&<"'>]/g, m => ({
+                '&': '&amp;', '<': '&lt;', '"': '&quot;', "'": '&#39;', '>': '&gt;'
+            }[m]));
+        }
+
+        function addMessage(msg) {
+            const messages = document.getElementById('messages');
+            let el = document.createElement('div');
+            el.className = "msg";
+            el.innerHTML = `<span class="user">${escapeHtml(msg.username)}</span>: ${escapeHtml(msg.message)} <span class="time">${msg.timestamp ? ("[" + msg.timestamp.slice(11,16) + "]") : ""}</span>`;
+            messages.appendChild(el);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        fetch('/messages').then(r => r.json()).then(data => {
+            data.messages.forEach(addMessage);
+        });
+
+        socket.on('receive_message', function(msg){
+            msg.timestamp = new Date().toISOString().slice(11,16); // Only time
+            addMessage(msg);
+        });
+
+        document.getElementById('send').onclick = function(){
+            const username = document.getElementById('username').value || 'Anonymous';
+            const input = document.getElementById('input');
+            const msg = input.value;
+            if(msg.trim() === '') return;
+            socket.emit('send_message', {username: username, message: msg});
+            input.value = '';
+        };
+
+        document.getElementById('input').addEventListener('keydown', function(e){
+            if(e.key === 'Enter') document.getElementById('send').click();
+        });
+    </script>
+</body>
+</html>
